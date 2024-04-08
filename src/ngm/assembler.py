@@ -41,7 +41,7 @@ parser = argparse.ArgumentParser(prog = 'ngm assembler', \
                                  description = 'Assembles code for ngm', \
                                  epilog = 'By Garron Anderson (report bugs to <garronanderson4321@gmail.com>)')
 parser.add_argument('filename')
-parser.add_argument('-o', '--output_file', nargs = '?', default = 'asm.out', help = 'assembled output file (default asm.out)')
+parser.add_argument('-o', '--output_file', nargs = '?', default = 'asm.out', help = 'assembled output file name (default asm.out)')
 parser.add_argument('-v', '--verbose', action = 'store_true', help = 'be vebose during compile')
 parser.add_argument('--version', action='version', version = '%(prog)s 0.1')
 args = parser.parse_args()
@@ -61,20 +61,20 @@ def convert_forms(lineno, line, mem_loc):
     
     global labels, variables
     
-    opcode, _, data = line.partition(' ')
+    opcode, _, data = line.partition(' ') # get opcode and data
     to_convert = data[1:]
     
-    if data.startswith('= '):
+    if data.startswith('= '): # strip variable declarations to fully process
         data = data[2:]
         to_convert = data[1:]
     
-    if not data:
+    if not data: # ok, there's no data
         data = 0
         
-    elif data.isdecimal():
+    elif data.isdecimal(): # the data is explicitly decimal, don't need try-except
         data = int(data)
         
-    elif data.startswith('d'): # try for decimal
+    elif data.startswith('d'): # try for explicit decimal
         try:
             data = int(to_convert)
         except ValueError:
@@ -115,7 +115,7 @@ def try_label(lineno, line, mem_loc):
         data = labels[data]
     except KeyError: # ok, retry later
         to_retry.append((lineno, line, mem_loc))
-        data = 0
+        data = 0 # this is fine, we'll fix it later
     
     return data
  
@@ -125,21 +125,21 @@ def retry_lines(to_retry):
     """
     
     global mem, labels
-    for lineno, line, mem_loc in to_retry:
-        opcode, _, data = line.partition(' ')
+    for lineno, line, mem_loc in to_retry: 
+        opcode, _, data = line.partition(' ') 
         
-        try:
+        try: # catch bad labels
             data = labels[data]
         except KeyError:
             raise AssemblyError(f'Unrecognized label {data} at line {lineno}')
         
-        try:
+        try: # catch bad opcodes
             opcode_int = opcodes[opcode]
         except KeyError:
-            raise AssemblyError(f'Illegal Opcode "{opcode}" on line {lineno+1}')
+            raise AssemblyError(f'Illegal opcode "{opcode}" on line {lineno+1}')
         
         print(f'Putting {opcode_int}, {data} at {mem_loc}')
-        mem[mem_loc] = [opcode_int, data]
+        mem[mem_loc] = [opcode_int, data] # and write to memory
         
 # --- END HELPER FUNCTIONS ---
          
@@ -173,11 +173,11 @@ for lineno, line in enumerate(assembly):
 
     if line.startswith("/"):  # Handle comments
         if DEBUG: print(f"Comment: {line[1:]} on line {lineno+1}")
-        continue  # Ignore comments
+        continue  # Ignore comments, they don't matter for output
 
     elif line.startswith(">"):  # Handle like .org
         mem_loc = int(line[1:]) - 1
-        if DEBUG: print(f"Going to {mem_loc+1}")
+        if DEBUG: print(f"Going to {mem_loc+1}") # TODO: What? Why?
         continue
     
     elif line.startswith("'"):  # Handle like .asciiz
