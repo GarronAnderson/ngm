@@ -1,10 +1,11 @@
-"""NGM Assembler v0.2
+"""NGM Assembler v0.3
 
 By Garron Anderson"""
 
 import argparse
 
 from opcodes import opcodes
+from explained import explained
 
 """
 EXAMPLE PROGRAM
@@ -37,20 +38,23 @@ JMP loop
 
 # use argparse to get config
 
-parser = argparse.ArgumentParser(prog = 'ngm assembler', \
+parser = argparse.ArgumentParser(prog = 'python assembler.py', \
                                  description = 'Assembles code for ngm', \
                                  epilog = 'By Garron Anderson (report bugs to <garronanderson4321@gmail.com>)')
 parser.add_argument('filename')
 parser.add_argument('-o', '--output_file', nargs = '?', default = 'asm.out', help = 'assembled output file name (default asm.out)')
-parser.add_argument('-v', '--verbose', action = 'store_true', help = 'be vebose during compile')
-parser.add_argument('--version', action='version', version = '%(prog)s 0.1')
+parser.add_argument('-v', '--verbose', action = 'store_true', help = 'be non-technically verbose and explain during compile')
+parser.add_argument('-vv', '--very_verbose', action = 'store_true', help = 'dump what is put to mem during assemble')
+parser.add_argument('--version', action='version', version = 'ngm assembler 0.3')
 args = parser.parse_args()
 
 # copy config in
 
 input_filename = args.filename
 output_filename = args.output_file
-DEBUG = args.verbose
+DEBUG = args.verbose or args.very_verbose
+verbose = args.verbose
+very_verbose = args.very_verbose
 
 # --- BEGIN HELPER FUNCTIONS ---
 
@@ -115,7 +119,7 @@ def try_label(lineno, line, mem_loc):
         data = labels[data]
     except KeyError: # ok, retry later
         to_retry.append((lineno, line, mem_loc))
-        data = 0 # this is fine, we'll fix it later
+        data = "retry label later" # this is fine, we'll fix it later
     
     return data
  
@@ -138,7 +142,7 @@ def retry_lines(to_retry):
         except KeyError:
             raise AssemblyError(f'Illegal opcode "{opcode}" on line {lineno+1}')
         
-        print(f'Putting {opcode_int}, {data} at {mem_loc}')
+        if very_verbose: print(f'{int(mem_loc):6}|{hex(mem_loc):8}|{opcode:4}|{opcode_int:4}|{raw_data:10}|{data}')
         mem[mem_loc] = [opcode_int, data] # and write to memory
         
 # --- END HELPER FUNCTIONS ---
@@ -176,35 +180,39 @@ for lineno, line in enumerate(assembly):
         continue  # Ignore comments, they don't matter for output
 
     elif line.startswith(">"):  # Handle like .org
-        mem_loc = int(line[1:]) - 1
-        if DEBUG: print(f"Going to {mem_loc+1}") # TODO: What? Why?
+        mem_loc = int(line[1:])
+        if verbose: print(f"Going to {mem_loc}")
+        if very_verbose: print() # just for formatting
         continue
     
     elif line.startswith("'"):  # Handle like .asciiz
         text = line[1:]
-        if DEBUG: print(f"Text <{text}> at line {lineno+1}")
+        if verbose: print(f"Text <{text}> at line {lineno+1}")
         for letter in text:
-            print(f'Putting {letter} at {mem_loc}')
+            if verbose: print(f'Putting {letter} at {mem_loc}')
+            if very_verbose: print(f'{int(mem_loc):6}|{hex(mem_loc):8}|    |    |{letter:10}|{ord(letter)}')
             mem[mem_loc] = [0, ord(letter)]
             mem_loc += 1
         continue
     
     elif line.startswith(":"): # label
         label_name = line[1:]
-        labels.update({label_name:mem_loc+1})
-        if DEBUG: print(f'Label {label_name} at location {mem_loc+1}')
+        labels.update({label_name:mem_loc})
+        if verbose: print(f'Label {label_name} at location {mem_loc}')
+        if very_verbose: print(f'{label_name}:')
         continue
     
     elif line.startswith("$"): # variable
         line = line[1:]
-        name, _, value = line.partition(" = ")
+        name, _, raw_value = line.partition(" = ")
         value = convert_forms(lineno, line, mem_loc)
         variables.update({name:value})
-        if DEBUG: print(f'Variable {name} with value {value}')
+        if verbose: print(f'Variable {name} with value {value}')
+        if very_verbose: print(f'      |${name:17}|{raw_value:10}|{value}\n')
         continue
 
     try: # get the numerical opcode
-        opcode, _, data = line.partition(" ")
+        opcode, _, raw_data = line.partition(" ")
         opcode_int = opcodes[opcode]
     except KeyError:
         raise AssemblyError(f'Illegal Opcode "{opcode}" on line {lineno+1}')
@@ -213,10 +221,11 @@ for lineno, line in enumerate(assembly):
     # so process the second half of the instruction 
     data = convert_forms(lineno, line, mem_loc)
     
-    if DEBUG: print(f'Opcode {opcode} with data {data} at location {mem_loc}')
+    if verbose: print(f'Opcode {opcode} ({explained[opcode]}) with data {data} at location {mem_loc}')
     
     # --- Okay, write to memory ---
     
+    if very_verbose: print(f'{int(mem_loc):6}|{hex(mem_loc):8}|{opcode:4}|{opcode_int:4}|{raw_data:10}|{data}')
     mem[mem_loc] = [opcode_int, data]
     
     mem_loc += 1
@@ -224,7 +233,7 @@ for lineno, line in enumerate(assembly):
 # --- END MAIN PROCESSING ---
 
 # retry missing labels
-
+if very_verbose: print("\nRetrying Labels") # formatting
 retry_lines(to_retry)
 
 # convert mem to binary

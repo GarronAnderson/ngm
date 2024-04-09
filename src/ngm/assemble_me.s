@@ -1,3 +1,5 @@
+/Assemble me to test the assembler.
+
 $PORTB = x6000
 $PORTA = x6003
 
