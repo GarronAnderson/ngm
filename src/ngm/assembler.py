@@ -46,22 +46,17 @@ parser.add_argument('-o', '--output_file', nargs = '?', default = 'asm.out', hel
 parser.add_argument('-v', '--verbose', action = 'store_true', help = 'be non-technically verbose and explain during compile')
 parser.add_argument('-vv', '--very_verbose', action = 'store_true', help = 'dump what is put to mem during assemble')
 parser.add_argument('--version', action='version', version = 'ngm assembler 0.3')
-args = parser.parse_args()
 
-# copy config in
-
-input_filename = args.filename
-output_filename = args.output_file
-DEBUG = args.verbose or args.very_verbose
-verbose = args.verbose
-very_verbose = args.very_verbose
 
 # --- BEGIN HELPER FUNCTIONS ---
 
 def convert_forms(lineno, line, mem_loc):
     """
     Convert data to decimal (from binary, hex, variable, label)
-    """
+    
+    Uses syntax markers documented in the docs."""
+    
+    # TODO: Add syntax markers to docs
     
     global labels, variables
     
@@ -109,7 +104,7 @@ def convert_forms(lineno, line, mem_loc):
 
 def try_label(lineno, line, mem_loc):
     """
-    Try to convert a label.
+    Try to convert a label to memory address.
     If it fails, add to the list of labels to retry.
     """
     
@@ -126,6 +121,7 @@ def try_label(lineno, line, mem_loc):
 def retry_lines(to_retry):
     """
     Retry missing labels.
+    If this fails, raise an AssemblyError.
     """
     
     global mem, labels
@@ -153,98 +149,116 @@ class AssemblyError(Exception):
     """
     pass
 
-
-# Set up mem
-mem = [[0, 0]] * 65536
-
-# get input to assemble
-assembly_in = open(input_filename)
-assembly = assembly_in.readlines()
-assembly_in.close()
-assembly = [line.strip() for line in assembly]
-
-# set up assembler
-mem_loc = 0
-labels = {}
-variables = {}
-to_retry = []
-
-# --- MAIN PROCESSING ----
-
-for lineno, line in enumerate(assembly):
-    if not line:  # skip empty lines
-        continue
-
-    if line.startswith("/"):  # Handle comments
-        if DEBUG: print(f"Comment: {line[1:]} on line {lineno+1}")
-        continue  # Ignore comments, they don't matter for output
-
-    elif line.startswith(">"):  # Handle like .org
-        mem_loc = int(line[1:])
-        if verbose: print(f"Going to {mem_loc}")
-        if very_verbose: print() # just for formatting
-        continue
+def main():
+    """
+    Assemble input and write to outfile.
+    """
     
-    elif line.startswith("'"):  # Handle like .asciiz
-        text = line[1:]
-        if verbose: print(f"Text <{text}> at line {lineno+1}")
-        for letter in text:
-            if verbose: print(f'Putting {letter} at {mem_loc}')
-            if very_verbose: print(f'{int(mem_loc):6}|{hex(mem_loc):8}|    |    |{letter:10}|{ord(letter)}')
-            mem[mem_loc] = [0, ord(letter)]
-            mem_loc += 1
-        continue
-    
-    elif line.startswith(":"): # label
-        label_name = line[1:]
-        labels.update({label_name:mem_loc})
-        if verbose: print(f'Label {label_name} at location {mem_loc}')
-        if very_verbose: print(f'{label_name}:')
-        continue
-    
-    elif line.startswith("$"): # variable
-        line = line[1:]
-        name, _, raw_value = line.partition(" = ")
-        value = convert_forms(lineno, line, mem_loc)
-        variables.update({name:value})
-        if verbose: print(f'Variable {name} with value {value}')
-        if very_verbose: print(f'      |${name:17}|{raw_value:10}|{value}\n')
-        continue
+    args = parser.parse_args()
 
-    try: # get the numerical opcode
-        opcode, _, raw_data = line.partition(" ")
-        opcode_int = opcodes[opcode]
-    except KeyError:
-        raise AssemblyError(f'Illegal Opcode "{opcode}" on line {lineno+1}')
-    
-    # if we're here we now have a numerical opcode
-    # so process the second half of the instruction 
-    data = convert_forms(lineno, line, mem_loc)
-    
-    if verbose: print(f'Opcode {opcode} ({explained[opcode]}) with data {data} at location {mem_loc}')
-    
-    # --- Okay, write to memory ---
-    
-    if very_verbose: print(f'{int(mem_loc):6}|{hex(mem_loc):8}|{opcode:4}|{opcode_int:4}|{raw_data:10}|{data}')
-    mem[mem_loc] = [opcode_int, data]
-    
-    mem_loc += 1
+    # copy config in
 
-# --- END MAIN PROCESSING ---
-
-# retry missing labels
-if very_verbose: print("\nRetrying Labels") # formatting
-retry_lines(to_retry)
-
-# convert mem to binary
-processed_mem = bytearray()
-for data in mem:
-    processed_mem.append(data[0])
-    msb, lsb = divmod(data[1], 256)
-    processed_mem.append(msb)
-    processed_mem.append(lsb)   
+    input_filename = args.filename
+    output_filename = args.output_file
+    DEBUG = args.verbose or args.very_verbose
+    verbose = args.verbose
+    very_verbose = args.very_verbose
     
-# --- write to file ---
-output_file = open(output_filename, 'wb')
-output_file.write(processed_mem)
-output_file.close()
+    # Set up mem
+    mem = [[0, 0]] * 65536
+
+    # get input to assemble
+    assembly_in = open(input_filename)
+    assembly = assembly_in.readlines()
+    assembly_in.close()
+    assembly = [line.strip() for line in assembly]
+
+    # set up assembler
+    mem_loc = 0
+    labels = {}
+    variables = {}
+    to_retry = []
+
+    # --- MAIN PROCESSING ----
+
+    for lineno, line in enumerate(assembly):
+        if not line:  # skip empty lines
+            continue
+
+        if line.startswith("/"):  # Handle comments
+            if DEBUG: print(f"Comment: {line[1:]} on line {lineno+1}")
+            continue  # Ignore comments, they don't matter for output
+
+        elif line.startswith(">"):  # Handle like .org
+            mem_loc = int(line[1:])
+            if verbose: print(f"Going to {mem_loc}")
+            if very_verbose: print() # just for formatting
+            continue
+        
+        elif line.startswith("'"):  # Handle like .asciiz
+            text = line[1:]
+            if verbose: print(f"Text <{text}> at line {lineno+1}")
+            for letter in text:
+                if verbose: print(f'Putting {letter} at {mem_loc}')
+                if very_verbose: print(f'{int(mem_loc):6}|{hex(mem_loc):8}|    |    |{letter:10}|{ord(letter)}')
+                mem[mem_loc] = [0, ord(letter)]
+                mem_loc += 1
+            continue
+        
+        elif line.startswith(":"): # label
+            label_name = line[1:]
+            labels.update({label_name:mem_loc})
+            if verbose: print(f'Label {label_name} at location {mem_loc}')
+            if very_verbose: print(f'{label_name}:')
+            continue
+        
+        elif line.startswith("$"): # variable
+            line = line[1:]
+            name, _, raw_value = line.partition(" = ")
+            value = convert_forms(lineno, line, mem_loc)
+            variables.update({name:value})
+            if verbose: print(f'Variable {name} with value {value}')
+            if very_verbose: print(f'      |${name:17}|{raw_value:10}|{value}\n')
+            continue
+
+        try: # get the numerical opcode
+            opcode, _, raw_data = line.partition(" ")
+            opcode_int = opcodes[opcode]
+        except KeyError:
+            raise AssemblyError(f'Illegal Opcode "{opcode}" on line {lineno+1}')
+        
+        # if we're here we now have a numerical opcode
+        # so process the second half of the instruction 
+        data = convert_forms(lineno, line, mem_loc)
+        
+        if verbose: print(f'Opcode {opcode} ({explained[opcode]}) with data {data} at location {mem_loc}')
+        
+        # --- Okay, write to memory ---
+        
+        if very_verbose: print(f'{int(mem_loc):6}|{hex(mem_loc):8}|{opcode:4}|{opcode_int:4}|{raw_data:10}|{data}')
+        mem[mem_loc] = [opcode_int, data]
+        
+        mem_loc += 1
+
+    # --- END MAIN PROCESSING ---
+
+    # retry missing labels
+    if very_verbose: print("\nRetrying Labels") # formatting
+    retry_lines(to_retry)
+
+    # convert mem to binary
+    processed_mem = bytearray()
+    for data in mem:
+        processed_mem.append(data[0])
+        msb, lsb = divmod(data[1], 256)
+        processed_mem.append(msb)
+        processed_mem.append(lsb)   
+        
+    # --- write to file ---
+    output_file = open(output_filename, 'wb')
+    output_file.write(processed_mem)
+    output_file.close()
+
+
+if __name__ == "__main__":
+    main()

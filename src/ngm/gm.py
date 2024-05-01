@@ -1,3 +1,9 @@
+"""
+Original assembler/virtual computer from Sebastian Miller.
+
+Unchanged from original source.
+"""
+
 import math
 import sys
 import pygame

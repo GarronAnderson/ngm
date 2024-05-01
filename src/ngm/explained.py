@@ -1,3 +1,7 @@
+"""
+A dictionary that converts mnemonics to explanations of what opcodes do.
+"""
+
 explained = {'ADD': 'Add A to B and store in Z',
  'CMP': 'Compare A and B (subtract but only set flags)',
  'CSB': 'Go to subroutine',

@@ -19,6 +19,10 @@ Ngm consists of an assembler and a virtual computer.
 To assemble a file called 'driver.s' and save to a file called 'driver.out' while being verbose, run:
 
     python assembler.py -v driver.s -o driver.out
+    
+Help options and usage info are avaliable for the assembler:
+
+    python assembler.py --help
 
 ## Contribute
 

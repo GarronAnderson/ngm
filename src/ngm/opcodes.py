@@ -1,3 +1,9 @@
+"""
+A dictionary that converts mnemonics to integer opcodes.
+
+Missing some opcodes that need to be added.
+"""
+
 opcodes = {'ADD': 43,
  'CMP': 45,
  'CSB': 55,
